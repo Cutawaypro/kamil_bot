@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import threading
+from aiohttp import web
 
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
@@ -15,6 +17,17 @@ from handlers.start import router as start_router
 from utils.scheduler import start_scheduler
 
 
+# --- фиктивный web-сервер для Render ---
+async def handle(request):
+    return web.Response(text="Bot is alive!")
+
+def run_web_server():
+    app = web.Application()
+    app.add_routes([web.get("/", handle)])
+    web.run_app(app, host="0.0.0.0", port=10000)
+
+
+# --- основной бот ---
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
@@ -27,10 +40,8 @@ async def main() -> None:
 
     dp = Dispatcher()
 
-    # запускаем планировщик (follow-up + дайджест)
     start_scheduler(bot)
 
-    # подключаем все обработчики
     dp.include_router(start_router)
     dp.include_router(admin_router)
     dp.include_router(audit_router)
@@ -38,9 +49,10 @@ async def main() -> None:
     dp.include_router(contact_router)
     dp.include_router(site_router)
 
-    # запускаем бота
     await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
+    # Запускаем фиктивный сервер в отдельном потоке
+    threading.Thread(target=run_web_server, daemon=True).start()
     asyncio.run(main())
